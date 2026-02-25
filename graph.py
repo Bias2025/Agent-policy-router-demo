@@ -122,7 +122,13 @@ Keep explanation short and audit-friendly.
             recommended_tools=proposed.recommended_tools,
             explanation=explanation,
             confidence=proposed.confidence,
-            policy_check={"policy_obj": obj, "policy_act": act, "allowed": allowed, "role": role},
+            policy_check=policy_check={
+            "policy_obj": obj,
+            "policy_act": act,
+            "allowed": allowed,
+            "role": role
+}
+,
         )
 
         log_event("routing_decision", {
