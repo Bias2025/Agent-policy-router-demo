@@ -1,20 +1,25 @@
-# Policy-Gated Agent Orchestration 
 
-## What it shows
-1) Orchestrator / Policy Router:
-- classifies intent (informational/operational/privileged/ambiguous)
-- checks Casbin policy to decide routing
-- emits structured routing decision + audit log
 
-2) Action Agent (Mock execution):
-- attempts tool execution through Tool Wrapper
-- Casbin enforces allow/deny (execution gate)
-- logs every attempt (audit)
+# LangGraph Policy-Gated Orchestration 
+
+## What it is
+- LangGraph orchestrates an Orchestrator node and (optionally) an Action Agent node.
+- Orchestrator uses OpenAI (via langchain-openai) to produce a structured RoutingDecision.
+- Casbin enforces:
+  1) planning gate (routing permissions)
+  2) execution gate (tool permissions)
+- Audit logs are written to audit_log.jsonl.
 
 ## Run locally
+export OPENAI_API_KEY="..."
 pip install -r requirements.txt
 streamlit run app.py
 
-## Deploy on Streamlit Cloud
+## Deploy to Streamlit Cloud
 - Push repo to GitHub
-- Create Streamlit Cloud app pointing to app.py
+- Create Streamlit app from repo
+- Add secret:
+  OPENAI_API_KEY = "..."
+
+
+
