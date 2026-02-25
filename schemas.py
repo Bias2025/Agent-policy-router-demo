@@ -14,7 +14,6 @@ class RoutingDecision(BaseModel):
     recommended_tools: ToolClass = "none"
     explanation: str
     confidence: float = Field(ge=0.0, le=1.0, default=0.75)
-    notes: Optional[str] = None
     policy_check: Dict[str, Any] = Field(default_factory=dict)
 
 class ActionResult(BaseModel):
