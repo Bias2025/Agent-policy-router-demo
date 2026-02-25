@@ -1,6 +1,4 @@
-import json
-import time
-import uuid
+import json, time, uuid
 from typing import Any, Dict
 
 AUDIT_PATH = "audit_log.jsonl"
