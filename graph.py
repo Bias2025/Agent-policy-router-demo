@@ -10,6 +10,20 @@ from schemas import RoutingDecision, ActionResult  # assumes schemas.py updated 
 from tools import execute_tool_with_policy
 from audit import log_event
 
+import re
+
+PRIVILEGED_PATTERNS = [
+    r"\breset\b.*\bpassword\b",
+    r"\bpassword\b.*\breset\b",
+    r"\bgrant\b.*\baccess\b",
+    r"\bdisable\b.*\baccount\b",
+    r"\belevate\b.*\bprivilege\b",
+    r"\bcreate\b.*\badmin\b",
+]
+def is_privileged(prompt: str) -> bool:
+    p = prompt.lower().strip()
+    return any(re.search(ptn, p) for ptn in PRIVILEGED_PATTERNS)
+
 
 class DemoState(TypedDict, total=False):
     user_id: str
