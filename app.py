@@ -6,6 +6,7 @@ import casbin
 from graph import build_graph
 from audit import tail_events
 
+st.write("Key exists:", bool(os.getenv("OPENAI_API_KEY")))
 st.set_page_config(page_title="LangGraph Policy-Gated Orchestration Demo", layout="centered")
 
 @st.cache_resource
