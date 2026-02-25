@@ -1,0 +1,28 @@
+# --- Role mappings ---
+g, alice, employee
+g, bob, it_admin
+g, carol, service_desk_agent
+
+# --- Orchestrator routing policies ---
+# employee can route informational + operational to knowledge/action (operational optional)
+p, employee, route:intent:informational, allow
+p, employee, route:intent:operational, allow
+p, employee, route:intent:privileged, deny
+
+p, it_admin, route:intent:informational, allow
+p, it_admin, route:intent:operational, allow
+p, it_admin, route:intent:privileged, allow
+
+p, service_desk_agent, route:intent:informational, allow
+p, service_desk_agent, route:intent:operational, allow
+p, service_desk_agent, route:intent:privileged, allow
+
+# --- Execution (tool) policies ---
+# Everyone can use KB search tool
+p, employee, tool:get_kb_article, execute
+p, it_admin, tool:get_kb_article, execute
+p, service_desk_agent, tool:get_kb_article, execute
+
+# Only it_admin + service_desk_agent can run reset_password
+p, it_admin, tool:reset_password, execute
+p, service_desk_agent, tool:reset_password, execute
