@@ -1,22 +1,25 @@
+import os
 import json
 import streamlit as st
 import casbin
 
-from router import orchestrate_route
-from tools import execute_tool_with_policy
+from graph import build_graph
 from audit import tail_events
 
-st.set_page_config(page_title="Policy-Gated Agent Orchestration Demo", layout="centered")
+st.set_page_config(page_title="LangGraph Policy-Gated Orchestration Demo", layout="centered")
 
 @st.cache_resource
 def load_enforcer():
-    # File-based Casbin model + policy. Works on Streamlit Cloud.
     return casbin.Enforcer("casbin_model.conf", "policy.csv")
+
+@st.cache_resource
+def load_graph(_enforcer, model_name: str):
+    return build_graph(_enforcer, model_name=model_name)
 
 enforcer = load_enforcer()
 
-st.title("Policy-Gated Agent Orchestration (Demo)")
-st.caption("Orchestrator routes requests under policy. Action Agent executes tools only through policy-gated wrappers.")
+st.title("LangGraph + OpenAI: Policy-Gated Agent Orchestration (Demo)")
+st.caption("LangGraph orchestrates Orchestrator → (optional) Action Agent. Casbin gates both planning and tool execution.")
 
 with st.sidebar:
     st.subheader("Identity Context")
@@ -25,95 +28,54 @@ with st.sidebar:
     ticket_id = st.text_input("ticket_id (optional)", value="")
 
     st.divider()
-    st.subheader("Demo Controls")
+    st.subheader("Model")
+    model_name = st.text_input("OpenAI model", value="gpt-4o-mini")
+
+    st.divider()
     show_audit = st.checkbox("Show audit log", value=True)
     audit_limit = st.slider("Audit log entries", 5, 50, 15)
 
-tabs = st.tabs(["1) Orchestrator / Policy Router", "2) Action Agent (Execution Gate Demo)"])
+# Streamlit Cloud: set OPENAI_API_KEY in Secrets
+if not os.getenv("OPENAI_API_KEY"):
+    st.warning("OPENAI_API_KEY is not set. Add it in Streamlit Cloud → App settings → Secrets.")
+    st.stop()
 
-# -------------------------
-# Tab 1: Orchestrator
-# -------------------------
-with tabs[0]:
-    st.subheader("User Request")
-    prompt = st.text_area("Enter a request", height=120, value="Reset John's password")
+graph = load_graph(enforcer, model_name=model_name)
 
-    if st.button("Route Request", type="primary"):
-        decision = orchestrate_route(
-            enforcer=enforcer,
-            user_id=user_id,
-            role=role,
-            prompt=prompt,
-            ticket_id=ticket_id.strip() or None
-        )
+st.subheader("User Request")
+prompt = st.text_area("Enter a request", height=120, value="Reset John's password")
 
-        st.subheader("Routing Decision (JSON)")
-        st.json(json.loads(decision.model_dump_json()))
-
-        st.subheader("Summary")
-        st.write(f"**Intent:** {decision.intent}")
-        st.write(f"**Risk tier:** {decision.risk_tier}")
-        st.write(f"**Route to:** {decision.route_to}")
-        if decision.required_prereqs:
-            st.write("**Required prerequisites:**")
-            for x in decision.required_prereqs:
-                st.write(f"- {x}")
-        st.write(f"**Recommended tools:** {decision.recommended_tools}")
-        st.write(f"**Explanation:** {decision.explanation}")
-        st.progress(min(max(decision.confidence, 0.0), 1.0))
-
-# -------------------------
-# Tab 2: Action Agent + Execution Gate
-# -------------------------
-with tabs[1]:
-    st.subheader("Action Agent (Mock) — Executes Tools Through Policy Gate")
-    st.caption("This simulates the “later” phase: Action Agent + Tool Wrapper + Casbin execution gate + audit log.")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        tool_name = st.selectbox("Tool", ["get_kb_article", "reset_password"])
-    with col2:
-        st.write("")
-
-    if tool_name == "get_kb_article":
-        query = st.text_input("query", value="VPN setup")
-        args = {"query": query}
-    else:
-        username = st.text_input("username", value="john")
-        args = {"username": username}
-
-    # Provide context for audit traceability
-    request_context = {
-        "ticket_id": ticket_id.strip() or None,
-        "demo_note": "Execution gate demo"
+if st.button("Run Orchestration", type="primary"):
+    state_in = {
+        "user_id": user_id.strip(),
+        "role": role,
+        "ticket_id": (ticket_id.strip() or None),
+        "prompt": prompt.strip(),
     }
 
-    if st.button("Attempt Tool Execution", type="primary"):
-        result = execute_tool_with_policy(
-            enforcer=enforcer,
-            user_id=user_id,
-            role=role,
-            tool_name=tool_name,
-            args=args,
-            request_context=request_context
-        )
+    out = graph.invoke(state_in)
 
-        st.subheader("Execution Result")
-        st.json(json.loads(result.model_dump_json()))
+    routing = out.get("routing")
+    action_result = out.get("action_result")
 
-        if result.output:
+    st.subheader("Routing Decision")
+    st.json(routing.model_dump() if routing else {"error": "No routing decision"})
+
+    if action_result:
+        st.subheader("Action Agent Result")
+        st.json(action_result.model_dump())
+        if action_result.output:
             st.subheader("Tool Output")
-            st.code(result.output)
+            st.code(action_result.output)
+    else:
+        st.info("Action Agent did not run (routed to knowledge_agent or human_service_desk).")
 
-# -------------------------
-# Audit log viewer
-# -------------------------
 if show_audit:
     st.divider()
     st.subheader("Audit Log (Latest)")
     events = tail_events(audit_limit)
     if not events:
-        st.info("No audit events yet. Route a request or attempt a tool execution.")
+        st.info("No audit events yet.")
     else:
         for e in reversed(events):
             st.json(e)
