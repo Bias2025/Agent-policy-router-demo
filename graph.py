@@ -274,4 +274,3 @@ def build_graph(enforcer, model_name: str = "gpt-4o-mini"):
     g.add_edge("action_agent", END)
 
     return g.compile()
-```
